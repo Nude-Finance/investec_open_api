@@ -6,3 +6,5 @@ gemspec
 gem 'pry'
 
 gem "faker", "~> 3.4"
+
+gem "base64"
