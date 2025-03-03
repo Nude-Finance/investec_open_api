@@ -2,6 +2,7 @@ require "faraday"
 require "investec_open_api/models/account"
 require "investec_open_api/models/transaction"
 require "investec_open_api/models/balance"
+require "investec_open_api/models/product"
 require "investec_open_api/models/transfer"
 require "investec_open_api/camel_case_refinement"
 require 'base64'
@@ -65,6 +66,21 @@ class InvestecOpenApi::Client
       JSON.generate(data)
     )
     response.body
+  end
+
+  # Get available products
+  # @return [Array<InvestecOpenApi::Models::Product>] Array of available products
+  def products
+    endpoint_url = "uk/bb/v1/products"
+    response = connection.get(endpoint_url)
+    
+    if response.body["data"].is_a?(Array)
+      response.body["data"].map do |product_raw|
+        InvestecOpenApi::Models::Product.from_api(product_raw)
+      end
+    else
+      []
+    end
   end
 
   # Create a fixed term deposit for an account
