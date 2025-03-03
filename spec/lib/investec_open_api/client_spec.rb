@@ -306,4 +306,188 @@ RSpec.describe InvestecOpenApi::Client do
       expect(result).to eq response_body
     end
   end
+
+  describe "#create_fixed_term_deposit" do
+    let(:account_id) { Faker::Number.number(digits: 10).to_s }
+    let(:product_id) { "32DayNotice" }
+    let(:amount) { Faker::Number.decimal(l_digits: 5, r_digits: 2) }
+    let(:external_reference) { "MyFTD-#{Faker::Number.number(digits: 5)}" }
+    
+    let(:ftd_response) do
+      {
+        data: {
+          id: "ftd#{Faker::Number.number(digits: 8)}",
+          startDate: Date.today.to_s,
+          endDate: (Date.today + 32).to_s,
+          productType: "32 Day Notice",
+          interestRatePercent: 5.75,
+          currency: "ZAR",
+          amount: amount,
+          status: "ACTIVE",
+          externalReference: external_reference
+        },
+        meta: nil
+      }
+    end
+
+    before do
+      client.authenticate!
+      
+      stub_request(:post, "#{api_url}uk/bb/v1/fixedtermdeposits")
+        .with(
+          body: {
+            productId: product_id,
+            amount: amount.to_s,
+            externalreference: external_reference
+          }.to_json,
+          headers: headers.merge({
+            'Content-Type' => 'application/json'
+          })
+        )
+        .to_return(
+          body: ftd_response.to_json,
+          headers: {
+            "Content-Type" => "application/json"
+          }
+        )
+    end
+
+    it "creates a fixed term deposit and returns the result as an InvestecOpenApi::Models::FixedTermDeposit instance" do
+      ftd = client.create_fixed_term_deposit(
+        product_id, 
+        amount, 
+        external_reference
+      )
+      
+      expect(ftd).to be_an_instance_of(InvestecOpenApi::Models::FixedTermDeposit)
+      expect(ftd.id).to eq ftd_response[:data][:id]
+      expect(ftd.product_type).to eq ftd_response[:data][:productType]
+      expect(ftd.amount.to_f).to eq ftd_response[:data][:amount]
+      expect(ftd.external_reference).to eq external_reference
+      expect(ftd.interest_rate_percent).to eq ftd_response[:data][:interestRatePercent]
+      expect(ftd.status).to eq ftd_response[:data][:status]
+    end
+  end
+
+  describe "#products" do
+    let(:products_data) do
+      {
+        data: [
+          {
+            id: "32DayNotice",
+            name: "32 Day Notice Account",
+            currency: "GBP",
+            type: "NoticeSavings",
+            aer: 4.25,
+            grossRate: 4.17,
+            description: "A 32 day notice account",
+            term: "32 days",
+            startdate: "2024-01-01",
+            endDate: "2024-12-31"
+          },
+          {
+            id: "90DayFixed",
+            name: "90 Day Fixed Term Deposit",
+            currency: "GBP",
+            type: "FixedTerm",
+            aer: 4.75,
+            grossRate: 4.65,
+            description: "A 90 day fixed term deposit",
+            term: "90 days",
+            startdate: "2024-01-01",
+            endDate: "2024-12-31"
+          }
+        ]
+      }.to_json
+    end
+
+    before do
+      client.authenticate!
+      stub_request(:get, "#{api_url}uk/bb/v1/products")
+        .with(headers: headers)
+        .to_return(
+          body: products_data,
+          headers: {
+            "Content-Type" => "application/json"
+          })
+    end
+
+    it "returns available products as InvestecOpenApi::Models::Product instances" do
+      products = client.products
+      
+      expect(products.length).to eq 2
+      expect(products.first).to be_an_instance_of(InvestecOpenApi::Models::Product)
+      expect(products.first.id).to eq "32DayNotice"
+      expect(products.first.name).to eq "32 Day Notice Account"
+      expect(products.first.gross_rate).to eq 4.17
+      
+      expect(products.last.id).to eq "90DayFixed"
+      expect(products.last.name).to eq "90 Day Fixed Term Deposit"
+    end
+  end
+
+  describe "#product" do
+    let(:product_id) { "32DayNotice" }
+    let(:product_data) do
+      {
+        data: {
+          id: "32DayNotice",
+          name: "32 Day Notice Account",
+          currency: "GBP",
+          type: "NoticeSavings",
+          aer: 4.25,
+          grossRate: 4.17,
+          description: "A 32 day notice account",
+          term: "32 days",
+          startdate: "2024-01-01",
+          endDate: "2024-12-31"
+        },
+        meta: nil
+      }.to_json
+    end
+
+    before do
+      client.authenticate!
+      stub_request(:get, "#{api_url}uk/bb/v1/products/#{product_id}")
+        .with(headers: headers)
+        .to_return(
+          body: product_data,
+          headers: {
+            "Content-Type" => "application/json"
+          })
+    end
+
+    it "returns the specific product as an InvestecOpenApi::Models::Product instance" do
+      product = client.product(product_id)
+      
+      expect(product).to be_an_instance_of(InvestecOpenApi::Models::Product)
+      expect(product.id).to eq "32DayNotice"
+      expect(product.name).to eq "32 Day Notice Account"
+      expect(product.currency).to eq "GBP"
+      expect(product.type).to eq "NoticeSavings"
+      expect(product.aer).to eq 4.25
+      expect(product.gross_rate).to eq 4.17
+      expect(product.description).to eq "A 32 day notice account"
+      expect(product.term).to eq "32 days"
+    end
+
+    context "when the product does not exist" do
+      let(:non_existent_product_id) { "NonExistentProduct" }
+      
+      before do
+        stub_request(:get, "#{api_url}uk/bb/v1/products/#{non_existent_product_id}")
+          .with(headers: headers)
+          .to_return(
+            body: { data: nil, meta: nil }.to_json,
+            headers: {
+              "Content-Type" => "application/json"
+            })
+      end
+      
+      it "returns nil" do
+        product = client.product(non_existent_product_id)
+        expect(product).to be_nil
+      end
+    end
+  end
 end

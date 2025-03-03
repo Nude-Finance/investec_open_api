@@ -2,6 +2,7 @@ require "faraday"
 require "investec_open_api/models/account"
 require "investec_open_api/models/transaction"
 require "investec_open_api/models/balance"
+require "investec_open_api/models/product"
 require "investec_open_api/models/transfer"
 require "investec_open_api/camel_case_refinement"
 require 'base64'
@@ -67,6 +68,59 @@ class InvestecOpenApi::Client
     response.body
   end
 
+  # Get available products
+  # @return [Array<InvestecOpenApi::Models::Product>] Array of available products
+  def products
+    endpoint_url = "uk/bb/v1/products"
+    response = connection.get(endpoint_url)
+    
+    if response.body["data"].is_a?(Array)
+      response.body["data"].map do |product_raw|
+        InvestecOpenApi::Models::Product.from_api(product_raw)
+      end
+    else
+      []
+    end
+  end
+
+  # Create a fixed term deposit for an account
+  # @param [String] account_id The id of the account to create the fixed term deposit for
+  # @param [String] product_id The product ID for the type of fixed term deposit
+  # @param [Float] amount The amount to deposit
+  # @param [String] external_reference A client-defined reference for this fixed term deposit
+  # @return [InvestecOpenApi::Models::FixedTermDeposit] The created fixed term deposit
+  def create_fixed_term_deposit(product_id, amount, external_reference)
+    endpoint_url = "uk/bb/v1/fixedtermdeposits"
+    
+    data = {
+      productId: product_id,
+      amount: amount.to_s,
+      externalreference: external_reference
+    }
+    
+    response = connection.post(
+      endpoint_url,
+      JSON.generate(data),
+      { 'Content-Type' => 'application/json' }
+    )
+    
+    InvestecOpenApi::Models::FixedTermDeposit.from_api(response.body["data"])
+  end
+
+  # Get a specific product by ID
+  # @param [String] product_id The ID of the product to retrieve
+  # @return [InvestecOpenApi::Models::Product, nil] The product details or nil if not found
+  def product(product_id)
+    endpoint_url = "uk/bb/v1/products/#{product_id}"
+    response = connection.get(endpoint_url)
+    
+    if response.body["data"]
+      InvestecOpenApi::Models::Product.from_api(response.body["data"])
+    else
+      nil
+    end
+  end
+
   private
 
   def get_oauth_token
@@ -80,8 +134,16 @@ class InvestecOpenApi::Client
         'Authorization' => "Basic #{auth_token}"
       }
     )
-
-    JSON.parse(response.body)
+    
+    if response.body.nil? || response.body.empty?
+      raise "Authentication failed: Empty response received (HTTP Status: #{response.status})"
+    end
+    
+    begin
+      JSON.parse(response.body)
+    rescue JSON::ParserError => e
+      raise "Authentication failed: Invalid JSON response (HTTP Status: #{response.status}): #{response.body.inspect}\nError: #{e.message}"
+    end
   end
 
   def connection
