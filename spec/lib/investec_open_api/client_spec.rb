@@ -306,4 +306,66 @@ RSpec.describe InvestecOpenApi::Client do
       expect(result).to eq response_body
     end
   end
+
+  describe "#create_fixed_term_deposit" do
+    let(:account_id) { Faker::Number.number(digits: 10).to_s }
+    let(:product_id) { "32DayNotice" }
+    let(:amount) { Faker::Number.decimal(l_digits: 5, r_digits: 2) }
+    let(:external_reference) { "MyFTD-#{Faker::Number.number(digits: 5)}" }
+    
+    let(:ftd_response) do
+      {
+        data: {
+          id: "ftd#{Faker::Number.number(digits: 8)}",
+          startDate: Date.today.to_s,
+          endDate: (Date.today + 32).to_s,
+          productType: "32 Day Notice",
+          interestRatePercent: 5.75,
+          currency: "ZAR",
+          amount: amount,
+          status: "ACTIVE",
+          externalReference: external_reference
+        },
+        meta: nil
+      }
+    end
+
+    before do
+      client.authenticate!
+      
+      stub_request(:post, "#{api_url}uk/bb/v1/fixedtermdeposits")
+        .with(
+          body: {
+            productId: product_id,
+            amount: amount.to_s,
+            externalreference: external_reference
+          }.to_json,
+          headers: headers.merge({
+            'Content-Type' => 'application/json'
+          })
+        )
+        .to_return(
+          body: ftd_response.to_json,
+          headers: {
+            "Content-Type" => "application/json"
+          }
+        )
+    end
+
+    it "creates a fixed term deposit and returns the result as an InvestecOpenApi::Models::FixedTermDeposit instance" do
+      ftd = client.create_fixed_term_deposit(
+        product_id, 
+        amount, 
+        external_reference
+      )
+      
+      expect(ftd).to be_an_instance_of(InvestecOpenApi::Models::FixedTermDeposit)
+      expect(ftd.id).to eq ftd_response[:data][:id]
+      expect(ftd.product_type).to eq ftd_response[:data][:productType]
+      expect(ftd.amount.to_f).to eq ftd_response[:data][:amount]
+      expect(ftd.external_reference).to eq external_reference
+      expect(ftd.interest_rate_percent).to eq ftd_response[:data][:interestRatePercent]
+      expect(ftd.status).to eq ftd_response[:data][:status]
+    end
+  end
 end

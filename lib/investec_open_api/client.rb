@@ -67,6 +67,30 @@ class InvestecOpenApi::Client
     response.body
   end
 
+  # Create a fixed term deposit for an account
+  # @param [String] account_id The id of the account to create the fixed term deposit for
+  # @param [String] product_id The product ID for the type of fixed term deposit
+  # @param [Float] amount The amount to deposit
+  # @param [String] external_reference A client-defined reference for this fixed term deposit
+  # @return [InvestecOpenApi::Models::FixedTermDeposit] The created fixed term deposit
+  def create_fixed_term_deposit(product_id, amount, external_reference)
+    endpoint_url = "uk/bb/v1/fixedtermdeposits"
+    
+    data = {
+      productId: product_id,
+      amount: amount.to_s,
+      externalreference: external_reference
+    }
+    
+    response = connection.post(
+      endpoint_url,
+      JSON.generate(data),
+      { 'Content-Type' => 'application/json' }
+    )
+    
+    InvestecOpenApi::Models::FixedTermDeposit.from_api(response.body["data"])
+  end
+
   private
 
   def get_oauth_token
