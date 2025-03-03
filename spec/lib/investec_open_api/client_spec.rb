@@ -425,4 +425,69 @@ RSpec.describe InvestecOpenApi::Client do
       expect(products.last.name).to eq "90 Day Fixed Term Deposit"
     end
   end
+
+  describe "#product" do
+    let(:product_id) { "32DayNotice" }
+    let(:product_data) do
+      {
+        data: {
+          id: "32DayNotice",
+          name: "32 Day Notice Account",
+          currency: "GBP",
+          type: "NoticeSavings",
+          aer: 4.25,
+          grossRate: 4.17,
+          description: "A 32 day notice account",
+          term: "32 days",
+          startdate: "2024-01-01",
+          endDate: "2024-12-31"
+        },
+        meta: nil
+      }.to_json
+    end
+
+    before do
+      client.authenticate!
+      stub_request(:get, "#{api_url}uk/bb/v1/products/#{product_id}")
+        .with(headers: headers)
+        .to_return(
+          body: product_data,
+          headers: {
+            "Content-Type" => "application/json"
+          })
+    end
+
+    it "returns the specific product as an InvestecOpenApi::Models::Product instance" do
+      product = client.product(product_id)
+      
+      expect(product).to be_an_instance_of(InvestecOpenApi::Models::Product)
+      expect(product.id).to eq "32DayNotice"
+      expect(product.name).to eq "32 Day Notice Account"
+      expect(product.currency).to eq "GBP"
+      expect(product.type).to eq "NoticeSavings"
+      expect(product.aer).to eq 4.25
+      expect(product.gross_rate).to eq 4.17
+      expect(product.description).to eq "A 32 day notice account"
+      expect(product.term).to eq "32 days"
+    end
+
+    context "when the product does not exist" do
+      let(:non_existent_product_id) { "NonExistentProduct" }
+      
+      before do
+        stub_request(:get, "#{api_url}uk/bb/v1/products/#{non_existent_product_id}")
+          .with(headers: headers)
+          .to_return(
+            body: { data: nil, meta: nil }.to_json,
+            headers: {
+              "Content-Type" => "application/json"
+            })
+      end
+      
+      it "returns nil" do
+        product = client.product(non_existent_product_id)
+        expect(product).to be_nil
+      end
+    end
+  end
 end

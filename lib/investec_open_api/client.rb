@@ -107,6 +107,20 @@ class InvestecOpenApi::Client
     InvestecOpenApi::Models::FixedTermDeposit.from_api(response.body["data"])
   end
 
+  # Get a specific product by ID
+  # @param [String] product_id The ID of the product to retrieve
+  # @return [InvestecOpenApi::Models::Product, nil] The product details or nil if not found
+  def product(product_id)
+    endpoint_url = "uk/bb/v1/products/#{product_id}"
+    response = connection.get(endpoint_url)
+    
+    if response.body["data"]
+      InvestecOpenApi::Models::Product.from_api(response.body["data"])
+    else
+      nil
+    end
+  end
+
   private
 
   def get_oauth_token
@@ -120,8 +134,16 @@ class InvestecOpenApi::Client
         'Authorization' => "Basic #{auth_token}"
       }
     )
-
-    JSON.parse(response.body)
+    
+    if response.body.nil? || response.body.empty?
+      raise "Authentication failed: Empty response received (HTTP Status: #{response.status})"
+    end
+    
+    begin
+      JSON.parse(response.body)
+    rescue JSON::ParserError => e
+      raise "Authentication failed: Invalid JSON response (HTTP Status: #{response.status}): #{response.body.inspect}\nError: #{e.message}"
+    end
   end
 
   def connection
