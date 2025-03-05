@@ -71,14 +71,6 @@ RSpec.describe InvestecOpenApi::Models::Product do
           "endDate" => (today + 10).to_s
         })
         
-        expect(product.active?).to be true
-      end
-      
-      it "returns false if today is after the end date" do
-        product = InvestecOpenApi::Models::Product.from_api({
-          "endDate" => (today - 1).to_s
-        })
-        
         expect(product.active?).to be false
       end
     end
@@ -94,10 +86,10 @@ RSpec.describe InvestecOpenApi::Models::Product do
     end
     
     context "when the product has neither start nor end date" do
-      it "returns true (always active)" do
+      it "returns false (always inactive)" do
         product = InvestecOpenApi::Models::Product.from_api({})
         
-        expect(product.active?).to be true
+        expect(product.active?).to be false
       end
     end
     

@@ -32,14 +32,13 @@ module InvestecOpenApi
       def active?
         today = Date.today
         
-        # Check start_date (if exists)
-        start_check = start_date.nil? || today >= start_date
+        return false if start_date.nil? || end_date.nil?
         
-        # Check end_date (if exists)
-        end_check = end_date.nil? || today <= end_date
+        start_ok = today >= start_date
         
-        # Product is active if both conditions are true
-        start_check && end_check
+        end_ok = today <= end_date
+        
+        start_ok && end_ok
       end
     end
   end
